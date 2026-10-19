@@ -1,0 +1,115 @@
+name: Build and publish CraftNova
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: craftnova-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: Build browser version
+    runs-on: ubuntu-latest
+    container:
+      image: trzeci/emscripten-fastcomp:1.39.0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Compile the browser client
+        shell: bash
+        run: |
+          make weblegacy RELEASE=1
+          test -s ClassiCube.js
+          mv ClassiCube.js CraftNova.js
+          test -s CraftNova.js
+
+      - name: Prepare the static website
+        shell: bash
+        run: |
+          mkdir -p _site/static
+          cp index.html _site/index.html
+          cp game.html _site/game.html
+          cp CraftNova.js _site/CraftNova.js
+          sed -i "s#'/static/default.zip'#'./static/default.zip'#g" _site/CraftNova.js
+          cp license.txt _site/LICENSE.txt
+          curl --fail --location --retry 3 --silent --show-error \
+            https://classicube.net/static/default.zip \
+            --output _site/static/default.zip
+          test -s _site/static/default.zip
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy browser version
+    needs: browser
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  windows:
+    name: Build Windows download
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install MinGW build tools
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            zip
+            mingw-w64-x86_64-gcc
+
+      - name: Compile and package Windows build
+        shell: msys2 {0}
+        run: |
+          make windows TARGET=CraftNova DIST_NAME=CraftNova RELEASE=1 EXTRA_LDFLAGS="-static -static-libgcc -static-libstdc++"
+          mkdir -p package/CraftNova/audio package/CraftNova/texpacks
+          cp CraftNova.exe package/CraftNova/CraftNova.exe
+          cp misc/cc_audio.zip package/CraftNova/audio/classicube.zip
+          cp misc/cc_textures.zip package/CraftNova/texpacks/classicube.zip
+          cp license.txt package/CraftNova/LICENSE.txt
+          (cd package && zip -qr ../CraftNova-Windows.zip CraftNova)
+          test -s CraftNova-Windows.zip
+
+      - name: Publish Windows download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: CraftNova Windows Build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            Automated Windows build of CraftNova.
+
+            Download CraftNova-Windows.zip, extract it, and run CraftNova.exe.
+            The source code and browser version are available in this repository.
+          files: CraftNova-Windows.zip
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
