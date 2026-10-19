@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#05070a">
+  <title>CraftNova — Browser Edition</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Segoe UI,Arial,sans-serif}
+    .topbar{height:48px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 14px;background:#080d13;border-bottom:1px solid #1d2c36}
+    .brand{font-size:16px;font-weight:900;letter-spacing:.4px}.brand span{color:#00d9ff}
+    #status{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#93a1af;font-size:12px}
+    .download{flex-shrink:0;color:#001218;background:#00d9ff;border-radius:7px;padding:8px 10px;text-decoration:none;font-size:12px;font-weight:800}
+    #game-shell{width:100%;height:calc(100% - 48px);background:#000}
+    #canvas{display:block;width:100%;height:100%;border:0;padding:0;background:#000;outline:none}
+    @media(max-width:560px){.topbar{padding:0 8px}.brand{font-size:13px}.download{padding:7px;font-size:11px}#status{font-size:10px}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">CRAFT<span>NOVA</span></div>
+    <div id="status" role="status" aria-live="polite">Loading browser game…</div>
+    <a class="download" href="https://github.com/GameREX1/CraftNova/releases/latest/download/CraftNova-Windows.zip">Download PC</a>
+  </div>
+  <div id="game-shell">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  </div>
+  <script>
+    var statusNode = document.getElementById("status");
+    var Module = {
+      preRun: [],
+      postRun: [],
+      arguments: ["CraftNova"],
+      print: function(text) {
+        if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(" ");
+        console.log(text);
+      },
+      printErr: function(text) {
+        if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(" ");
+        console.error(text);
+      },
+      canvas: document.getElementById("canvas"),
+      setStatus: function(text) { statusNode.textContent = text || "Ready"; },
+      totalDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        statusNode.textContent = left ? "Preparing game… (" + (this.totalDependencies - left) + "/" + this.totalDependencies + ")" : "Starting CraftNova…";
+      }
+    };
+    window.onerror = function(message) {
+      statusNode.textContent = "The game reported an error. Try refreshing this page.";
+      console.error(message);
+    };
+  </script>
+  <script async type="text/javascript" src="./CraftNova.js"></script>
+</body>
+</html>
